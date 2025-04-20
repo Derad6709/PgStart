@@ -1,0 +1,43 @@
+---
+- name: Debug second machine IP
+  ansible.builtin.debug:
+    msg: "The second-lowest scoring machine IP is {{ peer_machine_ip }}, student user will be accesible from this IP."
+- block:
+    - name: Get hba_file location
+      command: "sudo -u postgres psql -t -P format=unaligned -c 'show hba_file'"
+      register: hba_file
+
+    - name: Get config_file location
+      command: "sudo -u postgres psql -t -P format=unaligned -c 'SHOW config_file'"
+      register: config_file
+
+    - name: Configure postgresql.conf to listen on all IP addresses
+      lineinfile:
+        path: "{{ config_file.stdout }}"
+        regexp: "^#?listen_addresses"
+        line: "listen_addresses = '*'"
+
+    - name: Allow external connections from peer machine in pg_hba.conf
+      lineinfile:
+        path: "{{ hba_file.stdout }}"
+        line: "host    all    student    {{ peer_machine_ip }}/32    md5"
+
+    - name: Allow external connections from all IPs in pg_hba.conf
+      lineinfile:
+        path: "{{ hba_file.stdout }}"
+        line: "host    all    all    0.0.0.0/0    md5"
+
+    - name: Restart postgres
+      ansible.builtin.shell: |
+        for service in $(systemctl list-units --type=service | grep postgresql | awk '{print $1}');
+          do systemctl restart $service; 
+        done
+    - name: Test postgres
+      command: "sudo -u postgres psql -t -P format=unaligned -c 'SELECT 1'"
+      register: test_postgres
+
+    - name: Test postgres Output
+      ansible.builtin.debug:
+        msg: "{{ test_postgres }}"
+
+  become: true

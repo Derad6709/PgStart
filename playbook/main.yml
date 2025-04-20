@@ -1,0 +1,23 @@
+---
+- name: Collect system metrics
+  hosts: myhosts
+  roles:
+    - metrics_collection
+
+- name: Evaluate scores and select machines
+  hosts: myhosts
+  gather_facts: false
+  roles:
+    - score_evaluation
+
+- name: Install PostgreSQL on lowest score machine
+  hosts: lowest_score_group
+  gather_facts: false
+  roles:
+    - postgresql_install
+
+- name: Configure PostgreSQL on lowest score machine
+  hosts: lowest_score_group
+  gather_facts: false
+  roles:
+    - postgresql_configure

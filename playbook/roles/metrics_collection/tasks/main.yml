@@ -1,0 +1,32 @@
+---
+- name: Calculate Average Wait Time from Vmstat
+  ansible.builtin.shell: |
+    vmstat 1 5 | tail -n 4 | awk '{ sum += $16 } END { print sum/4 }'
+  register: vmstat_wa
+  changed_when: false
+
+- name: Set System Metrics Facts
+  ansible.builtin.set_fact:
+    la_5m_percent: "{{ ((ansible_facts['loadavg']['5m'] | float / ansible_facts['processor_vcpus']) * 100) | int }}"
+    used_ram_percent: "{{ 100 - ((ansible_facts['memfree_mb'] / ansible_facts['memtotal_mb']) * 100) | int }}"
+    free_disk_gb: "{{ (ansible_mounts | selectattr('mount', 'equalto', '/') | map(attribute='size_available') | first | int) // (1024*1024*1024) }}"
+    wa_percent: "{{ vmstat_wa.stdout | int }}"
+
+- name: Calculate Total Score
+  ansible.builtin.set_fact:
+    total_score: "{{ (wa_percent | int * score_weights.wa) + (((100 - free_disk_gb | int) if (free_disk_gb | int) <= disk_threshold_gb else 0) | int * score_weights.disk) + (used_ram_percent | int * score_weights.ram) + (la_5m_percent | int * score_weights.load) }}"
+
+- name: Display system metrics
+  ansible.builtin.debug:
+    msg: >
+      Average wa: {{ wa_percent }}%,
+      Load average (5m): {{ la_5m_percent }}%,
+      Free disk space: {{ (100 - free_disk_gb | int) if (free_disk_gb | int) <= disk_threshold_gb else 0 }}%,
+      Used RAM: {{ used_ram_percent }}%,
+      Total score: {{ total_score }}
+
+- name: Store score for aggregation
+  ansible.builtin.set_fact:
+    host_score: "{{ inventory_hostname }}:{{ total_score }}:{{ ansible_default_ipv4.address }}"
+    cacheable: true
+  delegate_facts: true

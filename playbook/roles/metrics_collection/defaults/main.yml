@@ -1,0 +1,7 @@
+---
+score_weights:
+  wa: 6
+  disk: 3
+  ram: 1
+  load: 1
+disk_threshold_gb: 100

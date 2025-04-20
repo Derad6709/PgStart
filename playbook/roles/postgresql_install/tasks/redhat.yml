@@ -1,0 +1,29 @@
+---
+- block:
+    - name: Install PostgreSQL repository
+      dnf:
+        name: "https://download.postgresql.org/pub/repos/yum/reporpms/EL-{{ ansible_distribution_major_version }}-x86_64/pgdg-redhat-repo-latest.noarch.rpm"
+        state: present
+        disable_gpg_check: yes
+
+    - name: Install PostgreSQL server and client
+      dnf:
+        name:
+          - "postgresql{{ postgresql_version }}-server"
+          - "postgresql{{ postgresql_version }}"
+        state: present
+        update_cache: yes
+        disable_gpg_check: yes
+
+    - name: Initialize PostgreSQL database
+      command: "/usr/pgsql-{{ postgresql_version }}/bin/postgresql-{{ postgresql_version }}-setup initdb"
+      register: initdb_result
+      ignore_errors: true
+      failed_when: "'Data directory is not empty!' not in stdout"
+
+    - name: Enable and start PostgreSQL service
+      systemd:
+        name: "postgresql-{{ postgresql_version }}"
+        enabled: yes
+        state: started
+  become: true

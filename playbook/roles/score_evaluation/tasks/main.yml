@@ -1,0 +1,25 @@
+---
+- name: Aggregate scores from all hosts
+  ansible.builtin.set_fact:
+    all_scores: "{{ hostvars | dict2items | selectattr('value.host_score', 'defined') | map(attribute='value.host_score') | list }}"
+
+- name: Find machine with lowest score
+  ansible.builtin.set_fact:
+    lowest_score_machine: "{{ all_scores | map('split', ':') | list | sort(attribute='1') | first }}"
+  when: all_scores | length > 0
+
+- name: Find machine with second-lowest score
+  ansible.builtin.set_fact:
+    second_lowest_score_machine: "{{ all_scores | map('split', ':') | list | sort(attribute='1') | list | slice(2) | last }}"
+  when: all_scores | length > 1
+
+- name: Set second machine IP
+  ansible.builtin.set_fact:
+    peer_machine_ip: "{{ second_lowest_score_machine[0][2] }}"
+  when: second_lowest_score_machine is defined
+
+- name: Add lowest score machine to dynamic group
+  ansible.builtin.add_host:
+    name: "{{ lowest_score_machine[0] }}"
+    groups: lowest_score_group
+  when: lowest_score_machine is defined
