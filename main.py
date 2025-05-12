@@ -42,7 +42,7 @@ def main():
     args = parser.parse_args()
 
     try:
-        host_list = args.hosts(',')
+        host_list = args.hosts.split(',')
         inventory = create_inventory(host_list)
         run_playbook(inventory)
 
